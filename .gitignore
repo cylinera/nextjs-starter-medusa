@@ -44,6 +44,7 @@ yarn-error.log*
 node_modules
 
 .yarn
+yarn.lock
 .swc
 dump.rdb
 /test-results/
@@ -55,3 +56,5 @@ dump.rdb
 /blob-report/
 /playwright/.cache/
 /playwright/.auth
+
+.history
