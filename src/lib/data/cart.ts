@@ -216,6 +216,7 @@ export async function initiatePaymentSession(
   cart: HttpTypes.StoreCart,
   data: {
     provider_id: string
+    amount?: number
     context?: Record<string, unknown>
   }
 ) {

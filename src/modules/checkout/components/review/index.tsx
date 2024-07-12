@@ -4,6 +4,7 @@ import { Heading, Text, clx } from "@medusajs/ui"
 
 import PaymentButton from "../payment-button"
 import { useSearchParams } from "next/navigation"
+import { placeOrder } from "@lib/data/cart"
 
 const Review = ({ cart }: { cart: any }) => {
   const searchParams = useSearchParams()
@@ -17,6 +18,8 @@ const Review = ({ cart }: { cart: any }) => {
     cart.shipping_address &&
     cart.shipping_methods.length > 0 &&
     (cart.payment_collection || paidByGiftcard)
+
+  const paymentSession = cart.payment_collection?.payment_sessions?.[0]
 
   return (
     <div className="bg-white">
@@ -45,7 +48,22 @@ const Review = ({ cart }: { cart: any }) => {
               </Text>
             </div>
           </div>
-          <PaymentButton cart={cart} data-testid="submit-order-button" />
+          <PaymentButton
+            provider={paymentSession.provider_id}
+            onCreatePaymentSession={async () => paymentSession}
+            notReady={
+              !cart ||
+              !cart.shipping_address ||
+              !cart.billing_address ||
+              !cart.email ||
+              (cart.shipping_methods?.length ?? 0) < 1
+            }
+            onPaymentCompleted={async () => await placeOrder()}
+            billingDetail={{ ...cart.billing_address, email: cart.email }}
+            data-testid="submit-order-button"
+          >
+            Place order
+          </PaymentButton>
         </>
       )}
     </div>

@@ -4,12 +4,17 @@ import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
 import { cache } from "react"
 import { getAuthHeaders } from "./cookies"
+import { HttpTypes } from "@medusajs/types"
+import { revalidateTag } from "next/cache"
 
 export const retrieveOrder = cache(async function (id: string) {
   return sdk.store.order
     .retrieve(
       id,
-      { fields: "*payment_collections.payments" },
+      {
+        fields:
+          "*payment_collections.payment_sessions,*payment_collections.payments",
+      },
       { next: { tags: ["order"] }, ...getAuthHeaders() }
     )
     .then(({ order }) => order)
@@ -25,3 +30,20 @@ export const listOrders = cache(async function (
     .then(({ orders }) => orders)
     .catch((err) => medusaError(err))
 })
+
+export async function addPaymentSession(
+  paymentCollectionId: string,
+  data: {
+    provider_id: string
+    amount?: number
+    context?: Record<string, unknown>
+  }
+) {
+  return sdk.store.payment
+    .addPaymentSession(paymentCollectionId, data, {}, getAuthHeaders())
+    .then((resp) => {
+      revalidateTag("order")
+      return resp
+    })
+    .catch(medusaError)
+}

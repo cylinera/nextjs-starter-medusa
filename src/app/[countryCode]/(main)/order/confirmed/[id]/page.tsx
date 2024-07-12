@@ -5,6 +5,7 @@ import { notFound } from "next/navigation"
 import { enrichLineItems } from "@lib/data/cart"
 import { retrieveOrder } from "@lib/data/orders"
 import { HttpTypes } from "@medusajs/types"
+import { listCartPaymentMethods } from "@lib/data/payment"
 
 type Props = {
   params: { id: string }
@@ -32,9 +33,15 @@ export const metadata: Metadata = {
 
 export default async function OrderConfirmedPage({ params }: Props) {
   const order = await getOrder(params.id)
+  const paymentMethods = await listCartPaymentMethods(order?.region_id ?? "")
   if (!order) {
     return notFound()
   }
 
-  return <OrderCompletedTemplate order={order} />
+  return (
+    <OrderCompletedTemplate
+      order={order}
+      availablePaymentMethods={paymentMethods}
+    />
+  )
 }

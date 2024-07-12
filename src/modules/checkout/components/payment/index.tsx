@@ -1,26 +1,39 @@
 "use client"
 
-import { useCallback, useContext, useEffect, useMemo, useState } from "react"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { RadioGroup } from "@headlessui/react"
-import ErrorMessage from "@modules/checkout/components/error-message"
 import { CheckCircleSolid, CreditCard } from "@medusajs/icons"
-import { Button, Container, Heading, Text, Tooltip, clx } from "@medusajs/ui"
-import { CardElement } from "@stripe/react-stripe-js"
+import {
+  Button,
+  Checkbox,
+  Container,
+  Heading,
+  Label,
+  Text,
+  clx,
+} from "@medusajs/ui"
+import ErrorMessage from "@modules/checkout/components/error-message"
+import Input from "@modules/common/components/input"
+import { CardElement, useStripe } from "@stripe/react-stripe-js"
 import { StripeCardElementOptions } from "@stripe/stripe-js"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useCallback, useContext, useEffect, useMemo, useState } from "react"
 
-import Divider from "@modules/common/components/divider"
-import PaymentContainer from "@modules/checkout/components/payment-container"
 import { isStripe as isStripeFunc, paymentInfoMap } from "@lib/constants"
-import { StripeContext } from "@modules/checkout/components/payment-wrapper"
 import { initiatePaymentSession } from "@lib/data/cart"
+import PaymentContainer from "@modules/checkout/components/payment-container"
+import Divider from "@modules/common/components/divider"
+import { StripeContext } from "../payment-wrapper"
 
 const Payment = ({
   cart,
+  paymentMethod,
   availablePaymentMethods,
+  onPaymentMethodChange,
 }: {
   cart: any
+  paymentMethod: string
   availablePaymentMethods: any[]
+  onPaymentMethodChange?: (provider: string) => void
 }) => {
   const activeSession = cart.payment_collection?.payment_sessions?.find(
     (paymentSession: any) => paymentSession.status === "pending"
@@ -30,9 +43,9 @@ const Payment = ({
   const [error, setError] = useState<string | null>(null)
   const [cardBrand, setCardBrand] = useState<string | null>(null)
   const [cardComplete, setCardComplete] = useState(false)
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(
-    activeSession?.provider_id ?? ""
-  )
+
+  const [installmentPayment, setInstallmentPayment] = useState(false)
+  const [downPaymentAmount, setDownPaymentAmount] = useState<string>("")
 
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -83,14 +96,18 @@ const Payment = ({
   }
 
   const handleSubmit = async () => {
+    if (installmentPayment && !parseInt(downPaymentAmount)) {
+      setError("Please input down payment amount")
+      return
+    }
     setIsLoading(true)
     try {
-      const shouldInputCard =
-        isStripeFunc(selectedPaymentMethod) && !activeSession
+      const shouldInputCard = isStripeFunc(paymentMethod) && !activeSession
 
       if (!activeSession) {
         await initiatePaymentSession(cart, {
-          provider_id: selectedPaymentMethod,
+          provider_id: paymentMethod,
+          amount: parseInt(downPaymentAmount),
         })
       }
 
@@ -129,6 +146,17 @@ const Payment = ({
           Payment
           {!isOpen && paymentReady && <CheckCircleSolid />}
         </Heading>
+        {isOpen && (
+          <Label className="flex items-center space-x-2">
+            <Checkbox
+              checked={installmentPayment}
+              onCheckedChange={(checked) =>
+                setInstallmentPayment(checked as boolean)
+              }
+            />
+            <Text>Installment</Text>
+          </Label>
+        )}
         {!isOpen && paymentReady && (
           <Text>
             <button
@@ -144,10 +172,19 @@ const Payment = ({
       <div>
         <div className={isOpen ? "block" : "hidden"}>
           {!paidByGiftcard && availablePaymentMethods?.length && (
-            <>
+            <div className="flex flex-col gap-2">
+              {installmentPayment && (
+                <Input
+                  label="Down Payment Amount"
+                  name="downPaymentAmount"
+                  value={downPaymentAmount}
+                  onChange={(e) => setDownPaymentAmount(e.target.value)}
+                  required
+                />
+              )}
               <RadioGroup
-                value={selectedPaymentMethod}
-                onChange={(value: string) => setSelectedPaymentMethod(value)}
+                value={paymentMethod}
+                onChange={onPaymentMethodChange}
               >
                 {availablePaymentMethods
                   .sort((a, b) => {
@@ -159,7 +196,7 @@ const Payment = ({
                         paymentInfoMap={paymentInfoMap}
                         paymentProviderId={paymentMethod.id}
                         key={paymentMethod.id}
-                        selectedPaymentOptionId={selectedPaymentMethod}
+                        selectedPaymentOptionId={paymentMethod}
                       />
                     )
                   })}
@@ -183,7 +220,7 @@ const Payment = ({
                   />
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {paidByGiftcard && (
@@ -211,12 +248,11 @@ const Payment = ({
             onClick={handleSubmit}
             isLoading={isLoading}
             disabled={
-              (isStripe && !cardComplete) ||
-              (!selectedPaymentMethod && !paidByGiftcard)
+              (isStripe && !cardComplete) || (!paymentMethod && !paidByGiftcard)
             }
             data-testid="submit-payment-button"
           >
-            {!activeSession && isStripeFunc(selectedPaymentMethod)
+            {!activeSession && isStripeFunc(paymentMethod)
               ? " Enter card details"
               : "Continue to review"}
           </Button>
@@ -233,8 +269,7 @@ const Payment = ({
                   className="txt-medium text-ui-fg-subtle"
                   data-testid="payment-method-summary"
                 >
-                  {paymentInfoMap[selectedPaymentMethod]?.title ||
-                    selectedPaymentMethod}
+                  {paymentInfoMap[paymentMethod]?.title || paymentMethod}
                 </Text>
               </div>
               <div className="flex flex-col w-1/3">
@@ -246,12 +281,10 @@ const Payment = ({
                   data-testid="payment-details-summary"
                 >
                   <Container className="flex items-center h-7 w-fit p-2 bg-ui-button-neutral-hover">
-                    {paymentInfoMap[selectedPaymentMethod]?.icon || (
-                      <CreditCard />
-                    )}
+                    {paymentInfoMap[paymentMethod]?.icon || <CreditCard />}
                   </Container>
                   <Text>
-                    {isStripeFunc(selectedPaymentMethod) && cardBrand
+                    {isStripeFunc(paymentMethod) && cardBrand
                       ? cardBrand
                       : "Another step will appear"}
                   </Text>

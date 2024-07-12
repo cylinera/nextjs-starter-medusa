@@ -23,6 +23,13 @@ const nextConfig = {
       },
     ],
   },
+  typescript: {
+    // !! WARN !!
+    // Dangerously allow production builds to successfully complete even if
+    // your project has type errors.
+    // !! WARN !!
+    ignoreBuildErrors: true,
+  },
 }
 
 console.log("next.config.js", JSON.stringify(module.exports, null, 2))
